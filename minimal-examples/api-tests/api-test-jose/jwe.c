@@ -193,7 +193,7 @@ test_jwe(struct lws_context *context)
 		return -1;
 	}
 
-	if (jwk.kty != LWS_GENCRYPTO_KYT_RSA) {
+	if (jwk.kty != LWS_GENCRYPTO_KTY_RSA) {
 		lwsl_err("%s: unexpected kty %d\n", __func__, jwk.kty);
 
 		return -1;

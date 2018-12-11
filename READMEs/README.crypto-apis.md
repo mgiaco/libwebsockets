@@ -15,6 +15,19 @@ or via another layer on top, which processes JOSE JSON objects using
 JWS (JSON Web Signatures), JWK (JSON Web Keys), and JWE (JSON Web
 Encryption).
 
+The `JW` apis use the generic apis (`lws_genrsa_`, etc) to get the crypto tasks
+done, so anything they can do you can also get done using the generic apis.
+The main difference is that with the generic apis, you must instantiate the
+correct types and use type-specfic apis.  With the `JW` apis, there is only
+one interface for all operations, with the details hidden in the api and
+controlled by the JSON objects.
+
+Because of this, the `JW` apis are often preferred because they give you
+"crypto agility" cheaply... to change your crypto to another supported algorithm
+once it's working, you literally just change your JSON defining the keys and
+JWE or JWS algorithm.  (It's up to you to define your policy for which
+combinations are acceptable by querying the parsed JW structs).
+
 ## Using the generic layer
 
 All the necessary includes are part of `libwebsockets.h`.

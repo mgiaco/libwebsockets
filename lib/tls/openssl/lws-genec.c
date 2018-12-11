@@ -24,6 +24,30 @@
 #include "core/private.h"
 #include "tls/openssl/private.h"
 
+#if !defined(LWS_HAVE_ECDSA_SIG_set0)
+static void
+ECDSA_SIG_get0(const ECDSA_SIG *sig, const BIGNUM **pr, const BIGNUM **ps)
+{
+    if (pr != NULL)
+        *pr = sig->r;
+    if (ps != NULL)
+        *ps = sig->s;
+}
+
+static int
+ECDSA_SIG_set0(ECDSA_SIG *sig, BIGNUM *r, BIGNUM *s)
+{
+	if (r == NULL || s == NULL)
+		return 0;
+	BN_clear_free(sig->r);
+	BN_clear_free(sig->s);
+	sig->r = r;
+	sig->s = s;
+
+	return 1;
+}
+#endif
+
 const struct lws_ec_curves lws_ec_curves[] = {
 	/*
 	 * These are the curves we are willing to use by default...
@@ -88,15 +112,16 @@ lws_genec_eckey_import(int nid, EVP_PKEY *pkey, struct lws_gencrypto_keyelem *el
 	}
 
 	n = EC_KEY_set_private_key(ec, bn_d);
-	BN_free(bn_d);
+	BN_clear_free(bn_d);
 	if (n != 1) {
 		lwsl_err("%s: EC_KEY_set_private_key fail\n", __func__);
 		goto bail;
 	}
 
-	if (EVP_PKEY_assign_EC_KEY(pkey, ec) != 1) {
+	n = EVP_PKEY_assign_EC_KEY(pkey, ec);
+	if (n != 1) {
 		lwsl_err("%s: EVP_PKEY_set1_EC_KEY failed\n", __func__);
-		goto bail;
+		return -1;
 	}
 
 	return 0;
@@ -141,6 +166,7 @@ lws_genec_keypair_import(const struct lws_ec_curves *curve_table,
 	*pctx = EVP_PKEY_CTX_new(pkey, NULL);
 	EVP_PKEY_free(pkey);
 	pkey = NULL;
+
 	if (!*pctx)
 		goto bail;
 
@@ -210,6 +236,11 @@ lws_genec_keypair_destroy(EVP_PKEY_CTX **pctx)
 {
 	if (!*pctx)
 		return;
+
+//	lwsl_err("%p\n", EVP_PKEY_get1_EC_KEY(EVP_PKEY_CTX_get0_pkey(*pctx)));
+
+//	EC_KEY_free(EVP_PKEY_get1_EC_KEY(EVP_PKEY_CTX_get0_pkey(*pctx)));
+
 	EVP_PKEY_CTX_free(*pctx);
 	*pctx = NULL;
 }
@@ -310,8 +341,8 @@ lws_genec_new_keypair(struct lws_genec_ctx *ctx, enum enum_lws_dh_side side,
 	ret = 0;
 
 bail2:
-	BN_free(bn[0]);
-	BN_free(bn[2]);
+	BN_clear_free(bn[0]);
+	BN_clear_free(bn[2]);
 bail1:
 	EVP_PKEY_free(pkey);
 bail:
@@ -341,6 +372,7 @@ lws_genecdsa_new_keypair(struct lws_genec_ctx *ctx, const char *curve_name,
 	return lws_genec_new_keypair(ctx, LDHS_OURS, curve_name, el);
 }
 
+#if 0
 LWS_VISIBLE LWS_EXTERN int
 lws_genecdsa_hash_sign(struct lws_genec_ctx *ctx, const uint8_t *in,
 		       enum lws_genhash_types hash_type,
@@ -385,47 +417,163 @@ bail:
 
 	return -1;
 }
+#endif
 
 LWS_VISIBLE LWS_EXTERN int
-lws_genecdsa_hash_sig_verify(struct lws_genec_ctx *ctx, const uint8_t *in,
-			   enum lws_genhash_types hash_type,
-			   const uint8_t *sig, size_t sig_len)
+lws_genecdsa_hash_sign_jws(struct lws_genec_ctx *ctx, const uint8_t *in,
+			   enum lws_genhash_types hash_type, int keybits,
+			   uint8_t *sig, size_t sig_len)
 {
-	const EVP_MD *md = lws_gencrypto_openssl_hash_to_EVP_MD(hash_type);
-	EVP_MD_CTX *mdctx = NULL;
-	int ret = -1;
+	int ret = -1, n, keybytes = lwsl_gencrypto_bits_to_bytes(keybits);
+	const BIGNUM *r = NULL, *s = NULL;
+	ECDSA_SIG *ecdsasig;
+	EC_KEY *eckey;
 
-	if (ctx->genec_alg != LEGENEC_ECDSA)
+	if (ctx->genec_alg != LEGENEC_ECDSA) {
+		lwsl_notice("%s: ctx alg %d\n", __func__, ctx->genec_alg);
 		return -1;
+	}
 
-	if (!md)
+	if ((int)sig_len < keybytes * 2) {
+		lwsl_notice("%s: sig buff %d < %d\n", __func__,
+			    (int)sig_len, keybytes * 2);
 		return -1;
+	}
 
-	mdctx = EVP_MD_CTX_create();
-	if (!mdctx)
-		goto bail;
+	eckey = EVP_PKEY_get1_EC_KEY(EVP_PKEY_CTX_get0_pkey(ctx->ctx));
 
-	if (EVP_DigestVerifyInit(mdctx, NULL, md, NULL,
-			       EVP_PKEY_CTX_get0_pkey(ctx->ctx))) {
-		lwsl_err("%s: EVP_DigestSignInit failed\n", __func__);
+	/*
+	 * The ECDSA P-256 SHA-256 digital signature is generated as follows:
+	 *
+	 * 1.  Generate a digital signature of the JWS Signing Input using ECDSA
+	 *     P-256 SHA-256 with the desired private key.  The output will be
+	 *     the pair (R, S), where R and S are 256-bit unsigned integers.
+	 *
+	 * 2.  Turn R and S into octet sequences in big-endian order, with each
+	 *     array being be 32 octets long.  The octet sequence
+	 *     representations MUST NOT be shortened to omit any leading zero
+	 *     octets contained in the values.
+	 *
+	 * 3.  Concatenate the two octet sequences in the order R and then S.
+	 *     (Note that many ECDSA implementations will directly produce this
+	 *     concatenation as their output.)
+	 *
+	 * 4.  The resulting 64-octet sequence is the JWS Signature value.
+	 */
 
+	ecdsasig = ECDSA_do_sign(in, lws_genhash_size(hash_type), eckey);
+	EC_KEY_free(eckey);
+	if (!ecdsasig) {
+		lwsl_notice("%s: ECDSA_do_sign fail\n", __func__);
 		goto bail;
 	}
-	if (EVP_DigestVerifyUpdate(mdctx, in, EVP_MD_size(md))) {
-		lwsl_err("%s: EVP_DigestSignUpdate failed\n", __func__);
 
+	ECDSA_SIG_get0(ecdsasig, &r, &s);
+
+	/*
+	 * in the 521-bit case, we have to pad the last byte as it only
+	 * generates 65 bytes
+	 */
+
+	sig[keybytes - 1] = 0;
+	n = BN_bn2bin(r, sig);
+	if (n != keybytes && n != keybytes - 1) {
+		lwsl_notice("%s: bignum r fail %d %d\n", __func__, n, keybytes);
 		goto bail;
 	}
-	if (EVP_DigestVerifyFinal(mdctx, sig, sig_len)) {
-		lwsl_err("%s: EVP_DigestSignFinal failed\n", __func__);
 
+	sig[keybytes + keybytes - 1] = 0;
+	n = BN_bn2bin(s, sig + keybytes);
+	if (n != keybytes && n != keybytes - 1) {
+		lwsl_notice("%s: bignum s fail %d %d\n", __func__, n, keybytes);
 		goto bail;
 	}
 
 	ret = 0;
+
 bail:
-	if (mdctx)
-		EVP_MD_CTX_free(mdctx);
+	if (ecdsasig)
+		ECDSA_SIG_free(ecdsasig);
+
+	return ret;
+}
+
+/* in is the JWS Signing Input hash */
+
+LWS_VISIBLE LWS_EXTERN int
+lws_genecdsa_hash_sig_verify_jws(struct lws_genec_ctx *ctx, const uint8_t *in,
+				 enum lws_genhash_types hash_type, int keybits,
+				 const uint8_t *sig, size_t sig_len)
+{
+	int ret = -1, n, keybytes = lwsl_gencrypto_bits_to_bytes(keybits),
+	    hlen = lws_genhash_size(hash_type);
+	ECDSA_SIG *ecsig = ECDSA_SIG_new();
+	BIGNUM *r = NULL, *s = NULL;
+	EC_KEY *eckey;
+
+	if (!ecsig)
+		return -1;
+
+	if (ctx->genec_alg != LEGENEC_ECDSA)
+		goto bail;
+
+	if ((int)sig_len != keybytes * 2) {
+		lwsl_err("%s: sig buf too small %d vs %d\n", __func__,
+			 (int)sig_len, keybytes * 2);
+		goto bail;
+	}
+	/*
+	 * 1.  The JWS Signature value MUST be a 64-octet sequence.  If it is
+	 *     not a 64-octet sequence, the validation has failed.
+	 *
+	 * 2.  Split the 64-octet sequence into two 32-octet sequences.  The
+	 *     first octet sequence represents R and the second S.  The values R
+	 *     and S are represented as octet sequences using the Integer-to-
+	 *     OctetString Conversion defined in Section 2.3.7 of SEC1 [SEC1]
+	 *     (in big-endian octet order).
+	 *
+	 * 3.  Submit the JWS Signing Input, R, S, and the public key (x, y) to
+	 *     the ECDSA P-256 SHA-256 validator.
+	 */
+
+	r = BN_bin2bn(sig, keybytes, NULL);
+	if (!r) {
+		lwsl_err("%s: BN_bin2bn (r) fail\n", __func__);
+		goto bail;
+	}
+
+	s = BN_bin2bn(sig + keybytes, keybytes, NULL);
+	if (!s) {
+		lwsl_err("%s: BN_bin2bn (s) fail\n", __func__);
+		goto bail1;
+	}
+
+	if (ECDSA_SIG_set0(ecsig, r, s) != 1) {
+		lwsl_err("%s: ECDSA_SIG_set0 fail\n", __func__);
+		goto bail1;
+	}
+
+	eckey = EVP_PKEY_get1_EC_KEY(EVP_PKEY_CTX_get0_pkey(ctx->ctx));
+
+	n = ECDSA_do_verify(in, hlen, ecsig, eckey);
+	EC_KEY_free(eckey);
+	if (n != 1) {
+		lwsl_err("%s: ECDSA_do_verify fail\n", __func__);
+		lws_tls_err_describe();
+		goto bail;
+	}
+
+	ret = 0;
+	goto bail;
+
+bail1:
+	if (r)
+		BN_free(r);
+	if (s)
+		BN_free(s);
+
+bail:
+	ECDSA_SIG_free(ecsig);
 
 	return ret;
 }

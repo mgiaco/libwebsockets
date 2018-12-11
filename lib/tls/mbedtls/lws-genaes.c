@@ -40,8 +40,12 @@ lws_genaes_create(struct lws_genaes_ctx *ctx, enum enum_aes_operation op,
 
 	switch (ctx->mode) {
 	case LWS_GAESM_XTS:
+#if defined(MBEDTLS_CIPHER_MODE_XTS)
 		mbedtls_aes_xts_init(&ctx->u.ctx_xts);
 		break;
+#else
+		return -1;
+#endif
 	case LWS_GAESM_GCM:
 		mbedtls_gcm_init(&ctx->u.ctx_gcm);
 		n = mbedtls_gcm_setkey(&ctx->u.ctx_gcm, MBEDTLS_CIPHER_ID_AES,
@@ -181,10 +185,14 @@ lws_genaes_crypt(struct lws_genaes_ctx *ctx, const uint8_t *in, size_t len,
 		break;
 
 	case LWS_GAESM_OFB:
+#if defined(MBEDTLS_CIPHER_MODE_OFB)
 		memcpy(iv, iv_or_nonce_ctr_or_data_unit_16, 16);
 		n = mbedtls_aes_crypt_ofb(&ctx->u.ctx, len, nc_or_iv_off, iv,
 					  in, out);
 		break;
+#else
+		return -1;
+#endif
 
 	case LWS_GAESM_XTS:
 #if defined(MBEDTLS_CIPHER_MODE_XTS)

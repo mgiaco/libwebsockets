@@ -129,7 +129,7 @@ lws_genrsa_create(struct lws_genrsa_ctx *ctx, struct lws_gencrypto_keyelem *el,
 bail:
 	for (n = 0; n < 5; n++)
 		if (ctx->bn[n]) {
-			BN_free(ctx->bn[n]);
+			BN_clear_free(ctx->bn[n]);
 			ctx->bn[n] = NULL;
 		}
 
@@ -168,7 +168,7 @@ lws_genrsa_new_keypair(struct lws_context *context, struct lws_genrsa_ctx *ctx,
 	}
 
 	n = RSA_generate_key_ex(ctx->rsa, bits, bn, NULL);
-	BN_free(bn);
+	BN_clear_free(bn);
 	if (n != 1)
 		goto cleanup_1;
 

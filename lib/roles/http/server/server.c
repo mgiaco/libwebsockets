@@ -1654,6 +1654,7 @@ lws_http_to_fallback(struct lws *wsi, unsigned char *obuf, size_t olen)
 	const struct lws_role_ops *role = &role_ops_raw_skt;
 	const struct lws_protocols *p1, *protocol =
 			 &wsi->vhost->protocols[wsi->vhost->raw_protocol_index];
+	char ipbuf[64];
 	int n;
 
 	if (wsi->vhost->listen_accept_role &&
@@ -1678,9 +1679,14 @@ lws_http_to_fallback(struct lws *wsi, unsigned char *obuf, size_t olen)
 	if (wsi->role_ops->adoption_cb[lwsi_role_server(wsi)])
 		n = wsi->role_ops->adoption_cb[lwsi_role_server(wsi)];
 
-	lwsl_notice("%s: vh %s, role %s, protocol %s, cb %d, ah %p\n",
-		    __func__, wsi->vhost->name, role->name, protocol->name, n,
-		    wsi->http.ah);
+	ipbuf[0] = '\0';
+#if !defined(LWS_PLAT_OPTEE)
+	lws_get_peer_simple(wsi, ipbuf, sizeof(ipbuf));
+#endif
+
+	lwsl_notice("%s: vh %s, peer: %s, role %s, "
+		    "protocol %s, cb %d, ah %p\n", __func__, wsi->vhost->name,
+		    ipbuf, role->name, protocol->name, n, wsi->http.ah);
 
 	if ((wsi->protocol->callback)(wsi, n, wsi->user_space, NULL, 0))
 		return 1;

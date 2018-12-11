@@ -18,7 +18,13 @@ News
 
 ## New features on master
 
- - **`lws-genec` ECDH + ECDSA** - Work in progress
+ - **`lws-genec` ECDSA** - JWS-compatible ECDSA is supported on both OpenSSL and mbedtls... ECDH-ES is work in progress
+
+ - **`jws`** - JWS (RFC7515) is now supported for none, HS256/384/512, RS256/384/512, and ES256/384/512, on both OpenSSL and mbedtls
+   [jws api](ihttps://libwebsockets.org/git/libwebsockets/tree/include/libwebsockets/lws-jws.h), 
+   [jws unit tests](https://libwebsockets.org/git/libwebsockets/tree/minimal-examples/api-tests/api-test-jose/jws.c)
+
+ - **`jwk`** - JWK (RFC7517) now supports oct, RSA and EC keys including JSON key arrays on both OpenSSL and mbedtls
 
  - **`lws-genrsa` OAEP + PSS support** - in addition to PKCS#1 1.5 padding, OAEP and PSS are
    now supported on both mbedtls and openssl backends.

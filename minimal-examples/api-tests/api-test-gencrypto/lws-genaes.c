@@ -450,6 +450,9 @@ bail:
 	return -1;
 }
 
+#if defined(MBEDTLS_CONFIG_H) && !defined(MBEDTLS_CIPHER_MODE_OFB)
+#else
+
 static const uint8_t
 	/*
 	 * produced with (plaintext.txt contains "test plaintext\0\0")
@@ -543,6 +546,8 @@ bail:
 
 	return -1;
 }
+
+#endif
 
 static const uint8_t
 	/*
@@ -763,8 +768,11 @@ test_genaes(struct lws_context *context)
 	if (test_genaes_ecb())
 		goto bail;
 
+#if defined(MBEDTLS_CONFIG_H) && !defined(MBEDTLS_CIPHER_MODE_OFB)
+#else
 	if (test_genaes_ofb())
 		goto bail;
+#endif
 
 #if defined(MBEDTLS_CONFIG_H) && !defined(MBEDTLS_CIPHER_MODE_XTS)
 #else

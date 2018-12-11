@@ -644,9 +644,11 @@ lejp_parse(struct lejp_ctx *ctx, const unsigned char *json, int len)
 						ret = LEJP_REJECT_CALLBACK;
 						goto reject;
 					}
-					ctx->callback(ctx, LEJPCB_COMPLETE);
-					/* done, return unused amount */
-					return len;
+					if (ctx->callback(ctx, LEJPCB_COMPLETE))
+						goto reject;
+					else
+						/* done, return unused amount */
+						return len;
 				}
 				/* pop */
 				ctx->sp--;

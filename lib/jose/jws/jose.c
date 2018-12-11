@@ -127,7 +127,7 @@ lws_jws_jose_cb(struct lejp_ctx *ctx, char reason)
 
 	/* past here, JWE only */
 
-	case LJJHI_ENC:	/* JWE only: Optional: string */
+	case LJJHI_ENC:	/* JWE only: Mandatory: string */
 		if (!args->is_jwe)
 			return -1;
 		if (lws_gencrypto_jwe_enc_to_definition(ctx->buf,
@@ -191,7 +191,7 @@ lws_jws_jose_cb(struct lejp_ctx *ctx, char reason)
 static int
 lws_jose_parse(const struct lws_jose_jwe_alg **_args,
 	       const struct lws_jose_jwe_alg **enc_args,
-	       uint8_t *buf, int n, int is_jwe)
+	       const uint8_t *buf, int n, int is_jwe)
 {
 	struct lejp_ctx jctx;
 	struct jose_cb_args args;
@@ -216,15 +216,15 @@ lws_jose_parse(const struct lws_jose_jwe_alg **_args,
 
 int
 lws_jws_parse_jose(const struct lws_jose_jwe_alg **args,
-		   uint8_t *buf, int n)
+		   const char *buf, int len)
 {
-	return lws_jose_parse(args, NULL, buf, n, 0);
+	return lws_jose_parse(args, NULL, (const uint8_t *)buf, len, 0);
 }
 
 int
 lws_jwe_parse_jose(const struct lws_jose_jwe_alg **args,
 		   const struct lws_jose_jwe_alg **enc_args,
-		   uint8_t *buf, int n)
+		   const char *buf, int len)
 {
-	return lws_jose_parse(args, enc_args, buf, n, 1);
+	return lws_jose_parse(args, enc_args, (const uint8_t *)buf, len, 1);
 }

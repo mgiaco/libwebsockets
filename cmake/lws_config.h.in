@@ -23,6 +23,7 @@
 #cmakedefine LWS_HAS_INTPTR_T
 #cmakedefine LWS_HAVE__ATOI64
 #cmakedefine LWS_HAVE_ATOLL
+#cmakedefine LWS_HAVE_ECDSA_SIG_set0
 #cmakedefine LWS_HAVE_EVP_MD_CTX_free
 #cmakedefine LWS_HAVE_LIBCAP
 #cmakedefine LWS_HAVE_MALLOC_H

@@ -54,7 +54,7 @@ test_genec1(struct lws_context *context)
 
 	lws_jwk_dump(&jwk);
 
-	if (jwk.kty != LWS_GENCRYPTO_KYT_EC) {
+	if (jwk.kty != LWS_GENCRYPTO_KTY_EC) {
 		lws_jwk_destroy(&jwk);
 		lwsl_err("%s: jwk is not an EC key\n", __func__);
 		return 1;

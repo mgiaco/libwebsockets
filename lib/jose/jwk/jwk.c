@@ -24,11 +24,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-static const char * const kyt_names[] = {
-	"unknown",	/* LWS_GENCRYPTO_KYT_UNKNOWN */
-	"oct",		/* LWS_GENCRYPTO_KYT_OCT */
-	"RSA",		/* LWS_GENCRYPTO_KYT_RSA */
-	"EC"		/* LWS_GENCRYPTO_KYT_EC */
+static const char * const kty_names[] = {
+	"unknown",	/* LWS_GENCRYPTO_KTY_UNKNOWN */
+	"oct",		/* LWS_GENCRYPTO_KTY_OCT */
+	"RSA",		/* LWS_GENCRYPTO_KTY_RSA */
+	"EC"		/* LWS_GENCRYPTO_KTY_EC */
 };
 
 /*
@@ -64,37 +64,38 @@ static const char * const jwk_tok[] = {
 
 /* information about each token declared above */
 
-#define F_B64	(1 << 10)
-#define F_B64U	(1 << 11)
-#define F_META	(1 << 12)
-#define F_RSA	(1 << 13)
-#define F_EC	(1 << 14)
-#define F_OCT	(1 << 15)
+#define F_M	(1 <<  9)	/* Mandatory for key type */
+#define F_B64	(1 << 10)	/* Base64 coded octets */
+#define F_B64U	(1 << 11)	/* Base64 Url coded octets */
+#define F_META	(1 << 12)	/* JWK key metainformation */
+#define F_RSA	(1 << 13)	/* RSA key */
+#define F_EC	(1 << 14)	/* Elliptic curve key */
+#define F_OCT	(1 << 15)	/* octet key */
 
-unsigned short tok_map[] = {
+static unsigned short tok_map[] = {
 	F_RSA | F_EC | F_OCT | F_META |		 0xff,
-	F_RSA |				F_B64U | LWS_GENCRYPTO_RSA_KEYEL_E,
-	F_RSA |				F_B64U | LWS_GENCRYPTO_RSA_KEYEL_N,
-	F_RSA | F_EC |			F_B64U | LWS_GENCRYPTO_RSA_KEYEL_D,
-	F_RSA |				F_B64U | LWS_GENCRYPTO_RSA_KEYEL_P,
-	F_RSA |				F_B64U | LWS_GENCRYPTO_RSA_KEYEL_Q,
-	F_RSA |				F_B64U | LWS_GENCRYPTO_RSA_KEYEL_DP,
-	F_RSA |				F_B64U | LWS_GENCRYPTO_RSA_KEYEL_DQ,
-	F_RSA |				F_B64U | LWS_GENCRYPTO_RSA_KEYEL_QI,
+	F_RSA |				F_B64U | F_M | LWS_GENCRYPTO_RSA_KEYEL_E,
+	F_RSA |				F_B64U | F_M | LWS_GENCRYPTO_RSA_KEYEL_N,
+	F_RSA | F_EC |			F_B64U |       LWS_GENCRYPTO_RSA_KEYEL_D,
+	F_RSA |				F_B64U |       LWS_GENCRYPTO_RSA_KEYEL_P,
+	F_RSA |				F_B64U |       LWS_GENCRYPTO_RSA_KEYEL_Q,
+	F_RSA |				F_B64U |       LWS_GENCRYPTO_RSA_KEYEL_DP,
+	F_RSA |				F_B64U |       LWS_GENCRYPTO_RSA_KEYEL_DQ,
+	F_RSA |				F_B64U |       LWS_GENCRYPTO_RSA_KEYEL_QI,
 
-	F_RSA | F_EC | F_OCT | F_META |		 JWK_META_KTY,
-		       F_OCT |		F_B64U | LWS_GENCRYPTO_OCT_KEYEL_K,
+	F_RSA | F_EC | F_OCT | F_META |		 F_M | JWK_META_KTY,
+		       F_OCT |		F_B64U | F_M | LWS_GENCRYPTO_OCT_KEYEL_K,
 
-		F_EC |				 LWS_GENCRYPTO_EC_KEYEL_CRV,
-		F_EC |			F_B64U | LWS_GENCRYPTO_EC_KEYEL_X,
-		F_EC |			F_B64U | LWS_GENCRYPTO_EC_KEYEL_Y,
+		F_EC |				 F_M | LWS_GENCRYPTO_EC_KEYEL_CRV,
+		F_EC |			F_B64U | F_M | LWS_GENCRYPTO_EC_KEYEL_X,
+		F_EC |			F_B64U | F_M | LWS_GENCRYPTO_EC_KEYEL_Y,
 
-	F_RSA | F_EC | F_OCT | F_META |		 JWK_META_KID,
-	F_RSA | F_EC | F_OCT | F_META |		 JWK_META_USE,
+	F_RSA | F_EC | F_OCT | F_META |		       JWK_META_KID,
+	F_RSA | F_EC | F_OCT | F_META |		       JWK_META_USE,
 
-	F_RSA | F_EC | F_OCT | F_META |		 JWK_META_KEY_OPS,
-	F_RSA | F_EC | F_OCT | F_META | F_B64 |	 JWK_META_X5C,
-	F_RSA | F_EC | F_OCT | F_META |		 JWK_META_ALG,
+	F_RSA | F_EC | F_OCT | F_META |		       JWK_META_KEY_OPS,
+	F_RSA | F_EC | F_OCT | F_META | F_B64 |	       JWK_META_X5C,
+	F_RSA | F_EC | F_OCT | F_META |		       JWK_META_ALG,
 };
 
 static const char *meta_names[] = {
@@ -136,21 +137,21 @@ lws_jwk_dump(struct lws_jwk *s)
 
 	switch (s->kty) {
 	default:
-	case LWS_GENCRYPTO_KYT_UNKNOWN:
+	case LWS_GENCRYPTO_KTY_UNKNOWN:
 		lwsl_err("%s: jwk %p: unknown type\n", __func__, s);
 
 		return 1;
-	case LWS_GENCRYPTO_KYT_OCT:
+	case LWS_GENCRYPTO_KTY_OCT:
 		elems = LWS_GENCRYPTO_OCT_KEYEL_COUNT;
 		enames = oct_names;
 		b64 = oct_b64;
 		break;
-	case LWS_GENCRYPTO_KYT_RSA:
+	case LWS_GENCRYPTO_KTY_RSA:
 		elems = LWS_GENCRYPTO_RSA_KEYEL_COUNT;
 		enames = rsa_names;
 		b64 = rsa_b64;
 		break;
-	case LWS_GENCRYPTO_KYT_EC:
+	case LWS_GENCRYPTO_KTY_EC:
 		elems = LWS_GENCRYPTO_EC_KEYEL_COUNT;
 		enames = ec_names;
 		b64 = ec_b64;
@@ -255,7 +256,7 @@ cb_jwk(struct lejp_ctx *ctx, char reason)
 {
 	struct cb_lws_jwk *cbs = (struct cb_lws_jwk *)ctx->user;
 	struct lws_jwk *s = cbs->s;
-	unsigned int idx, poss;
+	unsigned int idx, poss, n;
 
 	if (reason == LEJPCB_VAL_STR_START)
 		cbs->pos = 0;
@@ -288,6 +289,94 @@ cb_jwk(struct lejp_ctx *ctx, char reason)
 		}
 	}
 
+	if (reason == LEJPCB_COMPLETE) {
+
+		/*
+		 * Now we saw the whole jwk and know the key type, let's insist
+		 * that as a whole, it must be consistent and complete.
+		 *
+		 * The tracking of ->possible bits from even before we know the
+		 * kty already makes certain we cannot have key element members
+		 * defined that are inconsistent with the key type.
+		 */
+
+		for (n = 0; n < LWS_ARRAY_SIZE(tok_map); n++)
+			/*
+			 * All mandataory elements for the key type
+			 * must be present
+			 */
+			if ((tok_map[n] & cbs->possible) && (
+			    ((tok_map[n] & (F_M | F_META)) == (F_M | F_META) &&
+			     !s->meta[tok_map[n] & 0xff].buf) ||
+			    ((tok_map[n] & (F_M | F_META)) == F_M &&
+			     !s->e[tok_map[n] & 0xff].buf))) {
+				lwsl_notice("%s: missing %s\n", __func__,
+					    jwk_tok[n]);
+					return -3;
+				}
+
+		/*
+		 * When the key may be public or public + private, ensure the
+		 * intra-key members related to that are consistent.
+		 *
+		 * Only RSA keys need extra care, since EC keys are already
+		 * confirmed by making CRV, X and Y mandatory and only D
+		 * (the singular private part) optional.  For RSA, N and E are
+		 * also already known to be present using mandatory checking.
+		 */
+
+		/*
+		 * If a private key, it must have all D, P and Q.  Public key
+		 * must have none of them.
+		 */
+		if (s->kty == LWS_GENCRYPTO_KTY_RSA &&
+		    !(((!s->e[LWS_GENCRYPTO_RSA_KEYEL_D].buf) &&
+		      (!s->e[LWS_GENCRYPTO_RSA_KEYEL_P].buf) &&
+		      (!s->e[LWS_GENCRYPTO_RSA_KEYEL_Q].buf)) ||
+		      (s->e[LWS_GENCRYPTO_RSA_KEYEL_D].buf &&
+		       s->e[LWS_GENCRYPTO_RSA_KEYEL_P].buf &&
+		       s->e[LWS_GENCRYPTO_RSA_KEYEL_Q].buf))
+		      ) {
+			lwsl_notice("%s: RSA requires D, P and Q for private\n",
+				    __func__);
+			return -3;
+		}
+
+		/*
+		 * If the precomputed private key terms appear, they must all
+		 * appear together.
+		 */
+		if (s->kty == LWS_GENCRYPTO_KTY_RSA &&
+		    !(((!s->e[LWS_GENCRYPTO_RSA_KEYEL_DP].buf) &&
+		      (!s->e[LWS_GENCRYPTO_RSA_KEYEL_DQ].buf) &&
+		      (!s->e[LWS_GENCRYPTO_RSA_KEYEL_QI].buf)) ||
+		      (s->e[LWS_GENCRYPTO_RSA_KEYEL_DP].buf &&
+		       s->e[LWS_GENCRYPTO_RSA_KEYEL_DQ].buf &&
+		       s->e[LWS_GENCRYPTO_RSA_KEYEL_QI].buf))
+		      ) {
+			lwsl_notice("%s: RSA DP, DQ, QI must all appear "
+				    "or none\n", __func__);
+			return -3;
+		}
+
+		/*
+		 * The precomputed private key terms must not appear without
+		 * the private key itself also appearing.
+		 */
+		if (s->kty == LWS_GENCRYPTO_KTY_RSA &&
+		    !s->e[LWS_GENCRYPTO_RSA_KEYEL_D].buf &&
+		     s->e[LWS_GENCRYPTO_RSA_KEYEL_DQ].buf) {
+			lwsl_notice("%s: RSA DP, DQ, QI can appear only with "
+				    "private key\n", __func__);
+			return -3;
+		}
+
+		if ((s->kty == LWS_GENCRYPTO_KTY_RSA ||
+		     s->kty == LWS_GENCRYPTO_KTY_EC) &&
+		    s->e[LWS_GENCRYPTO_RSA_KEYEL_D].buf)
+		s->private_key = 1;
+	}
+
 	if (!(reason & LEJP_FLAG_CB_IS_VALUE) || !ctx->path_match)
 		return 0;
 
@@ -302,29 +391,29 @@ cb_jwk(struct lejp_ctx *ctx, char reason)
 	/* note: kty is not necessarily first... we have to keep track of
 	 * what could match given which element names have already been
 	 * seen.  Once kty comes, we confirm it's still possible (ie, it's
-	 * not trying to tell us that it's RSA when we saw a "crv"
-	 * already) and then reduce the possibilities to just the one that
+	 * not trying to tell us that it's RSA now when we saw a "crv"
+	 * earlier) and then reduce the possibilities to just the one that
 	 * kty told. */
-	case F_RSA | F_EC | F_OCT | F_META | JWK_META_KTY:
+	case F_RSA | F_EC | F_OCT | F_META | F_M | JWK_META_KTY:
 
 		if (!strcmp(ctx->buf, "oct")) {
 			if (!(cbs->possible & F_OCT))
 				goto elements_mismatch;
-			s->kty = LWS_GENCRYPTO_KYT_OCT;
+			s->kty = LWS_GENCRYPTO_KTY_OCT;
 			cbs->possible = F_OCT;
 			goto cont;
 		}
 		if (!strcmp(ctx->buf, "RSA")) {
 			if (!(cbs->possible & F_RSA))
 				goto elements_mismatch;
-			s->kty = LWS_GENCRYPTO_KYT_RSA;
+			s->kty = LWS_GENCRYPTO_KTY_RSA;
 			cbs->possible = F_RSA;
 			goto cont;
 		}
 		if (!strcmp(ctx->buf, "EC")) {
 			if (!(cbs->possible & F_EC))
 				goto elements_mismatch;
-			s->kty = LWS_GENCRYPTO_KYT_EC;
+			s->kty = LWS_GENCRYPTO_KTY_EC;
 			cbs->possible = F_EC;
 			goto cont;
 		}
@@ -425,7 +514,7 @@ lws_jwk_import(struct lws_jwk *s, lws_jwk_key_import_callback cb, void *user,
 		return -1;
 	}
 
-	if (s->kty == LWS_GENCRYPTO_KYT_UNKNOWN) {
+	if (s->kty == LWS_GENCRYPTO_KTY_UNKNOWN) {
 		lwsl_notice("%s: missing or unknown kyt\n", __func__);
 		return -1;
 	}
@@ -448,7 +537,7 @@ lws_jwk_export(struct lws_jwk *s, int private, char *p, size_t len)
 
 	switch (s->kty) {
 
-	case LWS_GENCRYPTO_KYT_OCT:
+	case LWS_GENCRYPTO_KTY_OCT:
 		if (!s->e[LWS_GENCRYPTO_OCT_KEYEL_K].buf)
 			return -1;
 
@@ -462,11 +551,11 @@ lws_jwk_export(struct lws_jwk *s, int private, char *p, size_t len)
 		p += n;
 
 		p += lws_snprintf(p, end - p, "\",\"kty\":\"%s\"}",
-				  kyt_names[s->kty]);
+				  kty_names[s->kty]);
 
 		return p - start;
 
-	case LWS_GENCRYPTO_KYT_RSA:
+	case LWS_GENCRYPTO_KTY_RSA:
 		if (!s->e[LWS_GENCRYPTO_RSA_KEYEL_E].buf ||
 		    !s->e[LWS_GENCRYPTO_RSA_KEYEL_N].buf ||
 		    (private && (!s->e[LWS_GENCRYPTO_RSA_KEYEL_D].buf ||
@@ -505,14 +594,14 @@ lws_jwk_export(struct lws_jwk *s, int private, char *p, size_t len)
 
 			if (!n) /* RFC7638 lexicographic order */
 				p += lws_snprintf(p, end - p, ",\"kty\":\"%s\"",
-						  kyt_names[s->kty]);
+						  kty_names[s->kty]);
 		}
 
 		p += lws_snprintf(p, end - p, "}");
 
 		return p - start;
 
-	case LWS_GENCRYPTO_KYT_EC:
+	case LWS_GENCRYPTO_KTY_EC:
 		return p - start;
 
 	default:

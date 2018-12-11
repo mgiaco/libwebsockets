@@ -52,6 +52,7 @@ struct lws_jwk {
 	/* generic meta key elements, like KID */
 	struct lws_gencrypto_keyelem meta[LWS_COUNT_JWK_ELEMENTS];
 	int kty;			/**< one of LWS_JWK_ */
+	char private_key; /* nonzero = has private key elements */
 };
 
 typedef int (*lws_jwk_key_import_callback)(struct lws_jwk *s, void *user);

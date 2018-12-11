@@ -439,7 +439,7 @@ lws_acme_load_create_auth_keys(struct per_vhost_data__lws_acme_client *vhd,
 			  NULL, NULL))
 		return 0;
 
-	vhd->jwk.kty = LWS_GENCRYPTO_KYT_RSA;
+	vhd->jwk.kty = LWS_GENCRYPTO_KTY_RSA;
 	lwsl_notice("Generating ACME %d-bit keypair... "
 		    "will take a little while\n", bits);
 	n = lws_genrsa_new_keypair(vhd->context, &vhd->rsactx, LGRSAM_PKCS1_1_5,

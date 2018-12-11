@@ -42,6 +42,20 @@
  *
  * Returns the length written to \p out, or -1.
  */
+
+enum enum_jwe_crypt_type {
+	LEJCT_ENC,
+	LEJCT_DEC
+};
+
+LWS_VISIBLE LWS_EXTERN struct lws_jwe_ctx *
+lws_jwe_crypt_init(struct lws_jwk *jwk, const struct lws_jose_jwe_alg *jose_alg,
+		   struct lws_context *context, enum enum_jwe_crypt_type type);
+
+LWS_VISIBLE LWS_EXTERN void
+lws_jwe_crypt_free(struct lws_jwe_ctx **jwe_ctx);
+
+
 LWS_VISIBLE LWS_EXTERN int
 lws_jwe_create_packet(struct lws_jwk *jwk,
 		      const struct lws_jose_jwe_alg *jose_alg,

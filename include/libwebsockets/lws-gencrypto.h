@@ -27,12 +27,12 @@
  * no dependency at all on any JOSE type.
  */
 
-enum lws_gencrypto_kyt {
-	LWS_GENCRYPTO_KYT_UNKNOWN,
+enum lws_gencrypto_kty {
+	LWS_GENCRYPTO_KTY_UNKNOWN,
 
-	LWS_GENCRYPTO_KYT_OCT,
-	LWS_GENCRYPTO_KYT_RSA,
-	LWS_GENCRYPTO_KYT_EC
+	LWS_GENCRYPTO_KTY_OCT,
+	LWS_GENCRYPTO_KTY_RSA,
+	LWS_GENCRYPTO_KTY_EC
 };
 
 /*
@@ -92,3 +92,4 @@ struct lws_gencrypto_keyelem {
 	uint8_t *buf;
 	uint16_t len;
 };
+
